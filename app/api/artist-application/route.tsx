@@ -59,10 +59,28 @@ function wrapText(text: string, maxWidth: number, font: any, fontSize: number) {
 async function processPhotoFile(file: File | null): Promise<Uint8Array | null> {
   if (!file || typeof (file as any)?.arrayBuffer !== "function") return null;
 
-  const raw = new Uint8Array(await (file as any).arrayBuffer());
-  const fixed = await sharp(raw).rotate().jpeg({ quality: 88 }).toBuffer();
-  return new Uint8Array(fixed);
+  try {
+    const raw = new Uint8Array(await (file as any).arrayBuffer());
+
+    if (!raw.length) {
+      console.warn("⚠️ processPhotoFile: empty input buffer, skipping this photo");
+      return null;
+    }
+
+    const fixed = await sharp(raw).rotate().jpeg({ quality: 88 }).toBuffer();
+
+    if (!fixed.length) {
+      console.warn("⚠️ processPhotoFile: sharp produced empty buffer, skipping this photo");
+      return null;
+    }
+
+    return new Uint8Array(fixed);
+  } catch (e) {
+    console.error("❌ processPhotoFile sharp error:", e);
+    return null; // НЕ кидаємо далі, просто не використовуємо це фото
+  }
 }
+
 
 async function SendToArtist(pdfBuffer: Buffer, chatId: string, filename: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN!;
