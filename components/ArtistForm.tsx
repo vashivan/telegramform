@@ -95,9 +95,9 @@ export default function ArtistForm() {
         method: "POST",
         body: fd, // не став заголовок Content-Type — браузер виставить boundary сам
       });
+      const text = await res.text();
       console.log("artist-application status:", res.status);
-
-      setStatus(res.ok ? "success" : "error");
+      console.log("artist-application body:", text);
 
       // Перенаправлення після короткої паузи
       if (res.ok) {
