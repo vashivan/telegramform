@@ -95,6 +95,7 @@ export default function ArtistForm() {
         method: "POST",
         body: fd, // не став заголовок Content-Type — браузер виставить boundary сам
       });
+      console.log("artist-application status:", res.status);
 
       setStatus(res.ok ? "success" : "error");
 
@@ -197,15 +198,13 @@ export default function ArtistForm() {
 
       <label className="text-m font-bold self-start">Photo (portrait / headshot)</label>
       <p className="text-gray-500 self-start text-sm">Click on the button below to upload picture.</p>
-
-      <label className="text-m font-bold self-start">Photo (portrait / headshot)</label>
       <input name="photo" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" />
       <label className="text-m font-bold self-start">Additional photos:</label>
       <input name="photo1" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" />
       <input name="photo2" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" />
-      <input name="photo3" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" /> 
-      <input name="photo4" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" /> 
-      <input name="photo5" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" /> 
+      <input name="photo3" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" />
+      <input name="photo4" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" />
+      <input name="photo5" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" />
       <input name="photo6" type="file" accept="image/*" className="bg-pink-800 p-2 w-full mb-5 cursor-pointer text-white flex items-center rounded-lg" />
       <p className="text-gray-500 text-justify text-sm">
         *by submitting this form I confirm that I agree to send my personal information and consent to its use by the company to contact me and assist in finding employment.
