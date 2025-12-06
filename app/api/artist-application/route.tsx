@@ -1,4 +1,4 @@
-// // app/api/artist-application/route.ts
+// app/api/artist-application/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,20 +8,18 @@ import sharp from "sharp";
 import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
-// const fontkit = require("fontkit");
-
 /* ---------- BRAND + LAYOUT ---------- */
 
 const BRAND = {
-  bg: rgb(0xFF / 255, 0xF7 / 255, 0xFB / 255),        // дуже легкий рожевий фон (#FFF7FB)
-  primary: rgb(0x11 / 255, 0x18 / 255, 0x27 / 255),   // текст #111827
-  accent: rgb(0xEC / 255, 0x4A / 255, 0x93 / 255),    // акцентний рожево-магентовий (#EC4A93)
-  muted: rgb(0x6B / 255, 0x72 / 255, 0x80 / 255),     // вторинний текст
+  bg: rgb(0xff / 255, 0xf7 / 255, 0xfb / 255),
+  primary: rgb(0x11 / 255, 0x18 / 255, 0x27 / 255),
+  accent: rgb(0xec / 255, 0x4a / 255, 0x93 / 255),
+  muted: rgb(0x6b / 255, 0x72 / 255, 0x80 / 255),
   white: rgb(1, 1, 1),
 };
 
 const MARGIN = { top: 60, bottom: 50, left: 48, right: 48 };
-const A4: [number, number] = [595.28, 841.89]; // pts
+const A4: [number, number] = [595.28, 841.89];
 
 const BODY = 10;
 const H1 = 22;
@@ -56,6 +54,8 @@ function wrapText(text: string, maxWidth: number, font: any, fontSize: number) {
 }
 
 /* ---------- TELEGRAM HELPERS ---------- */
+
+// безпечна обробка ОДНОГО фото
 async function processPhotoFile(file: File | null): Promise<Uint8Array | null> {
   if (!file || typeof (file as any)?.arrayBuffer !== "function") return null;
 
@@ -63,24 +63,23 @@ async function processPhotoFile(file: File | null): Promise<Uint8Array | null> {
     const raw = new Uint8Array(await (file as any).arrayBuffer());
 
     if (!raw.length) {
-      console.warn("⚠️ processPhotoFile: empty input buffer, skipping this photo");
+      console.warn("⚠️ processPhotoFile: empty input buffer, skipping photo");
       return null;
     }
 
     const fixed = await sharp(raw).rotate().jpeg({ quality: 88 }).toBuffer();
 
     if (!fixed.length) {
-      console.warn("⚠️ processPhotoFile: sharp produced empty buffer, skipping this photo");
+      console.warn("⚠️ processPhotoFile: sharp produced empty buffer, skipping photo");
       return null;
     }
 
     return new Uint8Array(fixed);
   } catch (e) {
     console.error("❌ processPhotoFile sharp error:", e);
-    return null; // НЕ кидаємо далі, просто не використовуємо це фото
+    return null;
   }
 }
-
 
 async function SendToArtist(pdfBuffer: Buffer, chatId: string, filename: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN!;
@@ -121,8 +120,9 @@ async function SendToArtist(pdfBuffer: Buffer, chatId: string, filename: string)
   }
 }
 
+// тепер тільки одне фото менеджеру + PDF
 async function sendPhotoAndPdfToTelegram(
-  photos: Uint8Array[],
+  photoBytes: Uint8Array | null,
   pdfBuffer: Buffer,
   filename: string,
   caption: string
@@ -135,29 +135,21 @@ async function sendPhotoAndPdfToTelegram(
     return;
   }
 
-  // 1) Відправляємо всі фото (по черзі)
-  if (photos && photos.length > 0) {
-    for (let i = 0; i < photos.length; i++) {
-      const bytes = photos[i];
-      const formPhoto = new FormData();
-      formPhoto.append("chat_id", chatId);
+  // 1) Фото (якщо є)
+  if (photoBytes) {
+    const formPhoto = new FormData();
+    formPhoto.append("chat_id", chatId);
+    formPhoto.append("caption", caption);
+    formPhoto.append("photo", new Blob([photoBytes as any], { type: "image/jpeg" }));
 
-      // Caption тільки до першого фото, щоб не спамити
-      if (i === 0) {
-        formPhoto.append("caption", caption);
-      }
+    const resPhoto = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: "POST",
+      body: formPhoto,
+    });
 
-      formPhoto.append("photo", new Blob([bytes as any], { type: "image/jpeg" }));
-
-      const resPhoto = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-        method: "POST",
-        body: formPhoto,
-      });
-
-      if (!resPhoto.ok) {
-        const text = await resPhoto.text().catch(() => "");
-        console.error("❌ Telegram sendPhoto (manager) error:", resPhoto.status, text);
-      }
+    if (!resPhoto.ok) {
+      const text = await resPhoto.text().catch(() => "");
+      console.error("❌ Telegram sendPhoto (manager) error:", resPhoto.status, text);
     }
   }
 
@@ -176,10 +168,9 @@ async function sendPhotoAndPdfToTelegram(
     const text = await resPdf.text().catch(() => "");
     console.error("❌ Telegram sendDocument (manager) error:", resPdf.status, text);
   } else {
-    console.log("✅ Photos + PDF sent to Telegram (manager)");
+    console.log("✅ Photo + PDF sent to Telegram (manager)");
   }
 }
-
 
 /* ---------- TABLE / LAYOUT HELPERS ---------- */
 
@@ -208,10 +199,9 @@ function drawTwoColTable(opts: {
     const lines = Math.max(kLines.length, vLines.length);
     const rowH = lines * LINE_H(fontSize) + rowPad * 2;
 
-    // Ліва колонка — muted label
     for (let li = 0; li < kLines.length; li++) {
       page.drawText(kLines[li], {
-        x: x,
+        x,
         y: cy + rowH - rowPad - (li + 1) * LINE_H(fontSize),
         size: fontSize,
         font,
@@ -219,7 +209,6 @@ function drawTwoColTable(opts: {
       });
     }
 
-    // Права колонка — основне значення
     for (let li = 0; li < vLines.length; li++) {
       page.drawText(vLines[li], {
         x: x + leftW + 8,
@@ -278,26 +267,9 @@ export async function POST(req: NextRequest) {
     const chatId = safe(formData.get("telegramChatId"));
     const couple = safe(formData.get("partnerTelegram"));
 
-    // Main portrait
+    // одне фото
     const mainPhotoFile = formData.get("photo") as File | null;
-
-    // Additional photos
-    const extraPhotoNames = ["photo1", "photo2", "photo3", "photo4", "photo5", "photo6"];
-    const extraPhotoFiles = extraPhotoNames.map((name) => formData.get(name) as File | null);
-
-    // Process all photos
     const mainPhotoBytes = await processPhotoFile(mainPhotoFile);
-    const extraPhotoBytes = await Promise.all(
-      extraPhotoFiles.map((file) => processPhotoFile(file))
-    );
-
-    // Масив усіх фото для Телеграму
-    const allPhotos: Uint8Array[] = [];
-    if (mainPhotoBytes) allPhotos.push(mainPhotoBytes);
-    for (const bytes of extraPhotoBytes) {
-      if (bytes) allPhotos.push(bytes);
-    }
-
 
     let fontRegularBytes: Uint8Array, fontBoldBytes: Uint8Array;
     try {
@@ -315,14 +287,8 @@ export async function POST(req: NextRequest) {
     const page = pdfDoc.addPage(A4);
     const { width, height } = page.getSize();
 
-    // Фон сторінки — легкий рожевий
-    page.drawRectangle({
-      x: 0,
-      y: 0,
-      width,
-      height,
-      color: BRAND.bg,
-    });
+    // фон
+    page.drawRectangle({ x: 0, y: 0, width, height, color: BRAND.bg });
 
     const fontRegular = await pdfDoc.embedFont(fontRegularBytes);
     const fontBold = await pdfDoc.embedFont(fontBoldBytes);
@@ -331,7 +297,6 @@ export async function POST(req: NextRequest) {
 
     let cursorY = height - MARGIN.top;
 
-    // Заголовок
     page.drawText("Artist Application", {
       x: MARGIN.left,
       y: cursorY,
@@ -346,7 +311,6 @@ export async function POST(req: NextRequest) {
     const bandW = width - MARGIN.left - MARGIN.right;
     const bandH = 30;
     const bandY = cursorY - bandH;
-
 
     const bandText = [
       `Name: ${fullName || "—"}`,
@@ -366,15 +330,15 @@ export async function POST(req: NextRequest) {
     /* ---------- MAIN COLUMNS ---------- */
 
     const colGap = 24;
-    const leftW = (width - MARGIN.left - MARGIN.right - colGap) * 0.60;
-    const rightW = (width - MARGIN.left - MARGIN.right - colGap) * 0.40;
+    const leftW = (width - MARGIN.left - MARGIN.right - colGap) * 0.6;
+    const rightW = (width - MARGIN.left - MARGIN.right - colGap) * 0.4;
     const leftX = MARGIN.left;
     const rightX = leftX + leftW + colGap;
 
     let cursorLeftY = bandY - 28;
     let cursorRightY = bandY - 28;
 
-    // LEFT: Contact & Basics
+    // LEFT
     page.drawText("Contact & Basics", {
       x: leftX,
       y: cursorLeftY,
@@ -383,7 +347,6 @@ export async function POST(req: NextRequest) {
       color: BRAND.accent,
     });
 
-    // cursorLeftY -= H2 + 8;
     cursorLeftY -= H2 + 226;
 
     cursorLeftY = drawTwoColTable({
@@ -448,11 +411,10 @@ export async function POST(req: NextRequest) {
         font: fontRegular,
         color: BRAND.muted,
       });
+      cursorRightY -= 40;
     }
 
-    cursorRightY -= 40;
-
-    /* ---------- BOTTOM STACK (FULL WIDTH) ---------- */
+    /* ---------- BOTTOM STACK ---------- */
 
     let stackY = Math.min(cursorLeftY, cursorRightY) - 32;
     if (stackY < 160) stackY = 160;
@@ -493,27 +455,9 @@ export async function POST(req: NextRequest) {
       stackY -= 24;
     };
 
-    // Experience
-    drawTextBlock({
-      title: "Experience",
-      text: experience || "—",
-      fontSize: BODY,
-    });
-
-    // Education
-    drawTextBlock({
-      title: "Education",
-      text: education || "—",
-      fontSize: 9,
-    });
-
-    // Additional
-    drawTextBlock({
-      title: "Additional",
-      text: additional || "—",
-      fontSize: 9,
-    });
-
+    drawTextBlock({ title: "Experience", text: experience || "—", fontSize: BODY });
+    drawTextBlock({ title: "Education", text: education || "—", fontSize: 9 });
+    drawTextBlock({ title: "Additional", text: additional || "—", fontSize: 9 });
 
     const pdfBuffer = Buffer.from(await pdfDoc.save());
 
@@ -531,16 +475,13 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    // Менеджеру
     await sendPhotoAndPdfToTelegram(
-      allPhotos,
+      mainPhotoBytes,
       pdfBuffer,
       `${(fullName || "candidate").replace(/\s+/g, "_")}_application.pdf`,
       captions
     );
 
-
-    // Артисту (якщо вказаний chatId)
     if (chatId) {
       await SendToArtist(
         pdfBuffer,
